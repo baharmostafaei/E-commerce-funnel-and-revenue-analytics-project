@@ -1,0 +1,7 @@
+channel_id,channel_name,channel_type,avg_cost_per_session,acquisition_weight
+1,Organic Search,Organic,0.0,0.22
+2,Paid Search,Paid,1.85,0.2
+3,Paid Social,Paid,1.35,0.18
+4,Email,Owned,0.05,0.12
+5,Direct,Organic,0.0,0.16
+6,Referral,Organic,0.2,0.12

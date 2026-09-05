@@ -1,0 +1,6 @@
+curl.exe -L -o olist_orders_dataset.csv "https://raw.githubusercontent.com/wheff70/OlistDataAnalysis/main/olist_orders_dataset.csv"
+curl.exe -L -o olist_customers_dataset.csv "https://raw.githubusercontent.com/wheff70/OlistDataAnalysis/main/olist_customers_dataset.csv"
+curl.exe -L -o olist_order_items_dataset.csv "https://raw.githubusercontent.com/wheff70/OlistDataAnalysis/main/olist_order_items_dataset.csv"
+curl.exe -L -o olist_order_payments_dataset.csv"https://raw.githubusercontent.com/wheff70/OlistDataAnalysis/main/olist_order_payments_dataset.csv"
+curl.exe -L -o olist_products_dataset.csv "https://raw.githubusercontent.com/wheff70/OlistDataAnalysis/main/olist_products_dataset.csv"
+curl.exe -L -o product_category_name_translation.csv "https://raw.githubusercontent.com/wheff70/OlistDataAnalysis/main/product_category_name_translation.csv"

@@ -1,0 +1,18 @@
+import pandas as pd 
+products = pd.read_csv("./data/raw/olist_products_dataset.csv") 
+cat_translation = pd.read_csv("./data/raw/product_category_name_translation.csv") 
+print("products before merge:", products.shape) 
+print("number of  null in category_name:", 
+products["product_category_name"].isna().sum()) 
+print(cat_translation.head())
+products = products.merge(cat_translation, on="product_category_name", how="left") 
+print("products after merge:", products.shape)
+products["product_category_name_english"] = products["product_category_name_english"].fillna("unknown") 
+print("number null after second  fillna:", products["product_category_name_english"].isna().sum())
+dim_products = products[["product_id", "product_category_name_english","product_weight_g", "product_length_cm", "product_height_cm", "product_width_cm"]].copy() 
+dim_products = dim_products.rename(columns={"product_category_name_english": "category_name"}) 
+dim_products["product_key"] = range(1, len(dim_products) + 1) 
+print(dim_products.head()) 
+print("number of unique values", dim_products["category_name"].nunique()) 
+dim_products.to_csv("./exports/dim_products.csv", index=False) 
+print("saved!")
