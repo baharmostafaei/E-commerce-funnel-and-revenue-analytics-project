@@ -8,3 +8,6 @@ channel_choice = rng.choice( dim_channel["channel_id"], size=n_users, p=dim_chan
 dim_users["acquisition_channel_id"] = channel_choice 
 print(dim_users.head())  
 print(dim_users["acquisition_channel_id"].value_counts(normalize=True).sort_index())
+
+dim_users.to_csv("./exports/dim_users.csv", index=False) 
+print("updated dim_users saved!")
