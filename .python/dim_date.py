@@ -20,3 +20,6 @@ dim_date["is_weekend"] = dim_date["full_date"].dt.dayofweek >= 5
 
 print(dim_date.head()) 
 print(dim_date["date_key"].is_unique)
+ 
+dim_date.to_csv("./exports/dim_date.csv", index=False) 
+print("saved!")
