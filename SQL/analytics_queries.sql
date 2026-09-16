@@ -187,31 +187,101 @@ ORDER BY year_month;
 -- Q7. CHURN RATE — customers with no repeat order within 180 days
 --     Uses LEAD() to find each customer's NEXT order date, then flags churn.
 -- ------------------------------------------------------------
-WITH customer_orders AS (
+WITH valid_orders AS (
     SELECT
         o.user_key,
-        d.full_date AS order_date,
-        LEAD(d.full_date) OVER (PARTITION BY o.user_key ORDER BY d.full_date) AS next_order_date
+        d.full_date AS order_date
     FROM fact_orders o
-    JOIN dim_date d ON d.date_key = o.date_key
+    JOIN dim_date d
+        ON d.date_key = o.date_key
     WHERE o.order_status NOT IN ('canceled', 'unavailable')
 ),
-flagged AS (
+
+-- Last observable date in the dataset
+dataset_bounds AS (
     SELECT
-        *,
+        MAX(order_date) AS max_order_date
+    FROM valid_orders
+),
+
+-- Order sequence for every customer
+ordered AS (
+    SELECT
+        user_key,
+        order_date,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY user_key
+            ORDER BY order_date
+        ) AS order_number,
+
+        LEAD(order_date) OVER (
+            PARTITION BY user_key
+            ORDER BY order_date
+        ) AS next_order_date
+
+    FROM valid_orders
+),
+
+-- Keep only first orders that had a full 180-day observation window
+eligible_customers AS (
+    SELECT
+        o.user_key,
+        o.order_date AS first_order_date,
+        o.next_order_date AS second_order_date,
+        b.max_order_date,
+
         CASE
-            WHEN next_order_date IS NULL THEN TRUE   -- no repeat order at all
-            WHEN next_order_date - order_date > INTERVAL '180 days' THEN TRUE
-            ELSE FALSE
-        END AS is_churn_after_this_order
-    FROM customer_orders
+            WHEN o.next_order_date IS NOT NULL
+                 AND o.next_order_date <= o.order_date + INTERVAL '180 days'
+            THEN FALSE
+            ELSE TRUE
+        END AS is_churned_180d
+
+    FROM ordered o
+    CROSS JOIN dataset_bounds b
+
+    WHERE o.order_number = 1
+
+      -- removes right-censored customers
+      AND o.order_date <= b.max_order_date - INTERVAL '180 days'
 )
+
 SELECT
-    DATE_TRUNC('month', order_date)::date AS cohort_month,
-    COUNT(*) AS orders,
-    SUM(CASE WHEN is_churn_after_this_order THEN 1 ELSE 0 END) AS churned_after,
-    ROUND(100.0 * SUM(CASE WHEN is_churn_after_this_order THEN 1 ELSE 0 END) / COUNT(*), 2) AS churn_rate_pct
-FROM flagged
+    DATE_TRUNC('month', first_order_date)::date AS cohort_month,
+
+    COUNT(*) AS eligible_customers,
+
+    SUM(
+        CASE
+            WHEN is_churned_180d THEN 1
+            ELSE 0
+        END
+    ) AS churned_customers,
+
+    SUM(
+        CASE
+            WHEN NOT is_churned_180d THEN 1
+            ELSE 0
+        END
+    ) AS repeat_customers,
+
+    ROUND(
+        100.0 *
+        SUM(CASE WHEN is_churned_180d THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(*), 0),
+        2
+    ) AS churn_rate_pct,
+
+    ROUND(
+        100.0 *
+        SUM(CASE WHEN NOT is_churned_180d THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(*), 0),
+        2
+    ) AS repeat_rate_180d_pct
+
+FROM eligible_customers
+
 GROUP BY 1
 ORDER BY 1;
 
@@ -236,3 +306,68 @@ FROM cat_state_rev
 WHERE rnk = 1
 ORDER BY revenue DESC
 LIMIT 15;
+
+-- ------------------------------------------------------------
+-- Q9. fact_customer_retention
+-- ------------------------------------------------------------
+WITH valid_orders AS (
+    SELECT
+        o.user_key,
+        o.channel_id,
+        d.full_date::date AS order_date
+    FROM fact_orders o
+    JOIN dim_date d
+        ON d.date_key = o.date_key
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+),
+
+dataset_bounds AS (
+    SELECT MAX(order_date) AS max_order_date
+    FROM valid_orders
+),
+
+ordered AS (
+    SELECT
+        user_key,
+        channel_id,
+        order_date,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY user_key
+            ORDER BY order_date
+        ) AS order_number,
+
+        LEAD(order_date) OVER (
+            PARTITION BY user_key
+            ORDER BY order_date
+        ) AS next_order_date
+
+    FROM valid_orders
+)
+
+SELECT
+    o.user_key,
+    o.channel_id,
+    o.order_date AS first_order_date,
+    o.next_order_date AS second_order_date,
+
+    CASE
+        WHEN o.next_order_date IS NOT NULL
+             AND o.next_order_date <= o.order_date + INTERVAL '180 days'
+        THEN 0
+        ELSE 1
+    END AS is_churned_180d,
+
+    CASE
+        WHEN o.next_order_date IS NOT NULL
+             AND o.next_order_date <= o.order_date + INTERVAL '180 days'
+        THEN 1
+        ELSE 0
+    END AS is_repeat_180d
+
+FROM ordered o
+CROSS JOIN dataset_bounds b
+
+WHERE o.order_number = 1
+  AND o.order_date <= b.max_order_date - INTERVAL '180 days';
+
